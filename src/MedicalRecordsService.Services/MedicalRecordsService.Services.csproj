@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\MedicalRecordsService.Repository\MedicalRecordsService.Repository.csproj" />
+    <ProjectReference Include="..\MedicalRecordsService.InternalModels\MedicalRecordsService.InternalModels.csproj" />
+    <ProjectReference Include="..\MedicalRecordsService.Utils\MedicalRecordsService.Utils.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

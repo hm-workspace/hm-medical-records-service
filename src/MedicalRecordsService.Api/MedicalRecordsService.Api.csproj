@@ -1,13 +1,17 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
-
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
-
+  <ItemGroup>
+    <ProjectReference Include="..\MedicalRecordsService.Data\MedicalRecordsService.Data.csproj" />
+    <ProjectReference Include="..\MedicalRecordsService.Repository\MedicalRecordsService.Repository.csproj" />
+    <ProjectReference Include="..\MedicalRecordsService.Services\MedicalRecordsService.Services.csproj" />
+    <ProjectReference Include="..\MedicalRecordsService.InternalModels\MedicalRecordsService.InternalModels.csproj" />
+    <ProjectReference Include="..\MedicalRecordsService.Utils\MedicalRecordsService.Utils.csproj" />
+  </ItemGroup>
 </Project>
