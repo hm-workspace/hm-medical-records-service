@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using MedicalRecordsService.Utils.Common;
 using MedicalRecordsService.InternalModels.DTOs;
 using MedicalRecordsService.InternalModels.Entities;
@@ -6,6 +7,7 @@ using MedicalRecordsService.Services;
 
 namespace MedicalRecordsService.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/medical-records")]
 public class MedicalRecordsController : ControllerBase
