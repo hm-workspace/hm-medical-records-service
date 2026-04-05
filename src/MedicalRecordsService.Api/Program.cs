@@ -1,6 +1,7 @@
 using System.Text;
 using MedicalRecordsService.Data;
 using MedicalRecordsService.Repository;
+using MedicalRecordsService.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -29,7 +30,8 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddControllers();
 builder.Services.AddScoped<IDbConnectionFactory, SqlConnectionFactory>();
-builder.Services.AddScoped<IMedicalRecordRepository, DapperMedicalRecordRepository>();
+builder.Services.AddScoped<IMedicalRecordRepository, MedicalRecordRepository>();
+builder.Services.AddScoped<IMedicalRecordService, MedicalRecordService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -57,6 +59,11 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+
 app.UseSwagger(options =>
 {
     options.RouteTemplate = "api/medical-records/swagger/{documentName}/swagger.json";
@@ -76,6 +83,7 @@ app.MapControllers();
 app.MapGet("/health", () => Results.Ok());
 
 app.Run();
+
 
 
 
