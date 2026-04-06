@@ -46,20 +46,26 @@ public class MedicalRecordRepository : IMedicalRecordRepository
             using var connection = _connectionFactory.CreateConnection();
             const string sql = @"
                 SELECT
-                    Id,
-                    CONCAT('MR-', Id) AS RecordNumber,
-                    PatientId,
-                    DoctorId,
-                    COALESCE(UpdatedAt, CreatedAt) AS RecordDate,
-                    Diagnosis,
-                    TreatmentPlan,
-                    Description AS Notes
-                FROM medical_records
-                WHERE CONCAT('MR-', Id) LIKE @SearchTerm
-                   OR Diagnosis LIKE @SearchTerm 
-                   OR TreatmentPlan LIKE @SearchTerm
-                   OR Description LIKE @SearchTerm
-                ORDER BY COALESCE(UpdatedAt, CreatedAt) DESC";
+                    mr.Id,
+                    CONCAT('MR-', mr.Id) AS RecordNumber,
+                    mr.PatientId,
+                    mr.DoctorId,
+                    COALESCE(mr.UpdatedAt, mr.CreatedAt) AS RecordDate,
+                    mr.Diagnosis,
+                    mr.TreatmentPlan,
+                    mr.Description AS Notes,
+                    CONCAT(p.FirstName, ' ', p.LastName) AS PatientName,
+                    CONCAT(d.FirstName, ' ', d.LastName) AS DoctorName
+                FROM medical_records mr
+                LEFT JOIN patients p ON mr.PatientId = p.Id
+                LEFT JOIN doctors d ON mr.DoctorId = d.Id
+                WHERE CONCAT('MR-', mr.Id) LIKE @SearchTerm
+                   OR mr.Diagnosis LIKE @SearchTerm 
+                   OR mr.TreatmentPlan LIKE @SearchTerm
+                   OR mr.Description LIKE @SearchTerm
+                   OR CONCAT(p.FirstName, ' ', p.LastName) LIKE @SearchTerm
+                   OR CONCAT(d.FirstName, ' ', d.LastName) LIKE @SearchTerm
+                ORDER BY COALESCE(mr.UpdatedAt, mr.CreatedAt) DESC";
             var rows = await connection.QueryAsync<MedicalRecordEntity>(sql, new { SearchTerm = $"%{searchTerm}%" });
             return rows.ToList();
         }
