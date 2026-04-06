@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using Dapper;
 using MedicalRecordsService.Data;
 using MedicalRecordsService.InternalModels.Entities;
 
@@ -19,7 +18,18 @@ public class MedicalRecordRepository : IMedicalRecordRepository
         try
         {
             using var connection = _connectionFactory.CreateConnection();
-            const string sql = "SELECT * FROM MedicalRecords ORDER BY RecordDate DESC";
+            const string sql = @"
+                SELECT
+                    Id,
+                    CONCAT('MR-', Id) AS RecordNumber,
+                    PatientId,
+                    DoctorId,
+                    COALESCE(UpdatedAt, CreatedAt) AS RecordDate,
+                    Diagnosis,
+                    TreatmentPlan,
+                    Description AS Notes
+                FROM medical_records
+                ORDER BY COALESCE(UpdatedAt, CreatedAt) DESC";
             var rows = await connection.QueryAsync<MedicalRecordEntity>(sql);
             return rows.ToList();
         }
@@ -35,11 +45,21 @@ public class MedicalRecordRepository : IMedicalRecordRepository
         {
             using var connection = _connectionFactory.CreateConnection();
             const string sql = @"
-                SELECT * FROM MedicalRecords 
-                WHERE RecordNumber LIKE @SearchTerm 
+                SELECT
+                    Id,
+                    CONCAT('MR-', Id) AS RecordNumber,
+                    PatientId,
+                    DoctorId,
+                    COALESCE(UpdatedAt, CreatedAt) AS RecordDate,
+                    Diagnosis,
+                    TreatmentPlan,
+                    Description AS Notes
+                FROM medical_records
+                WHERE CONCAT('MR-', Id) LIKE @SearchTerm
                    OR Diagnosis LIKE @SearchTerm 
                    OR TreatmentPlan LIKE @SearchTerm
-                ORDER BY RecordDate DESC";
+                   OR Description LIKE @SearchTerm
+                ORDER BY COALESCE(UpdatedAt, CreatedAt) DESC";
             var rows = await connection.QueryAsync<MedicalRecordEntity>(sql, new { SearchTerm = $"%{searchTerm}%" });
             return rows.ToList();
         }
@@ -54,7 +74,18 @@ public class MedicalRecordRepository : IMedicalRecordRepository
         try
         {
             using var connection = _connectionFactory.CreateConnection();
-            const string sql = "SELECT * FROM MedicalRecords WHERE Id = @Id";
+            const string sql = @"
+                SELECT
+                    Id,
+                    CONCAT('MR-', Id) AS RecordNumber,
+                    PatientId,
+                    DoctorId,
+                    COALESCE(UpdatedAt, CreatedAt) AS RecordDate,
+                    Diagnosis,
+                    TreatmentPlan,
+                    Description AS Notes
+                FROM medical_records
+                WHERE Id = @Id";
             return await connection.QueryFirstOrDefaultAsync<MedicalRecordEntity>(sql, new { Id = id });
         }
         catch
@@ -68,7 +99,19 @@ public class MedicalRecordRepository : IMedicalRecordRepository
         try
         {
             using var connection = _connectionFactory.CreateConnection();
-            const string sql = "SELECT * FROM MedicalRecords WHERE PatientId = @PatientId ORDER BY RecordDate DESC";
+            const string sql = @"
+                SELECT
+                    Id,
+                    CONCAT('MR-', Id) AS RecordNumber,
+                    PatientId,
+                    DoctorId,
+                    COALESCE(UpdatedAt, CreatedAt) AS RecordDate,
+                    Diagnosis,
+                    TreatmentPlan,
+                    Description AS Notes
+                FROM medical_records
+                WHERE PatientId = @PatientId
+                ORDER BY COALESCE(UpdatedAt, CreatedAt) DESC";
             var rows = await connection.QueryAsync<MedicalRecordEntity>(sql, new { PatientId = patientId });
             return rows.ToList();
         }
@@ -82,11 +125,18 @@ public class MedicalRecordRepository : IMedicalRecordRepository
     {
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
-            INSERT INTO MedicalRecords (RecordNumber, PatientId, DoctorId, RecordDate, Diagnosis, TreatmentPlan, Notes)
-            VALUES (@RecordNumber, @PatientId, @DoctorId, @RecordDate, @Diagnosis, @TreatmentPlan, @Notes);
+            INSERT INTO medical_records
+                (PatientId, DoctorId, AppointmentId, RecordType, Title, Description, Diagnosis, TreatmentPlan, FollowUpRequired, FollowUpDate, CreatedAt, UpdatedAt)
+            VALUES
+                (@PatientId, @DoctorId, NULL, 'General', COALESCE(NULLIF(@RecordNumber, ''), 'Medical Record'), @Notes, @Diagnosis, @TreatmentPlan, 0, NULL, SYSUTCDATETIME(), SYSUTCDATETIME());
             SELECT CAST(SCOPE_IDENTITY() as int)";
         var id = await connection.ExecuteScalarAsync<int>(sql, record);
         record.Id = id;
+        record.RecordNumber = $"MR-{id}";
+        if (record.RecordDate == default)
+        {
+            record.RecordDate = DateTime.UtcNow;
+        }
         return record;
     }
 
@@ -96,12 +146,12 @@ public class MedicalRecordRepository : IMedicalRecordRepository
         {
             using var connection = _connectionFactory.CreateConnection();
             const string sql = @"
-                UPDATE MedicalRecords 
+                UPDATE medical_records 
                 SET DoctorId = @DoctorId,
-                    RecordDate = @RecordDate,
+                    Description = @Notes,
                     Diagnosis = @Diagnosis,
                     TreatmentPlan = @TreatmentPlan,
-                    Notes = @Notes
+                    UpdatedAt = SYSUTCDATETIME()
                 WHERE Id = @Id";
             var rowsAffected = await connection.ExecuteAsync(sql, record);
             return rowsAffected > 0;
@@ -117,7 +167,7 @@ public class MedicalRecordRepository : IMedicalRecordRepository
         try
         {
             using var connection = _connectionFactory.CreateConnection();
-            const string sql = "DELETE FROM MedicalRecords WHERE Id = @Id";
+            const string sql = "DELETE FROM medical_records WHERE Id = @Id";
             var rowsAffected = await connection.ExecuteAsync(sql, new { Id = id });
             return rowsAffected > 0;
         }
