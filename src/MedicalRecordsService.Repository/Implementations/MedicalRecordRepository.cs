@@ -1,142 +1,57 @@
 ﻿using Dapper;
 using MedicalRecordsService.Data;
 using MedicalRecordsService.InternalModels.Entities;
+using System.Data;
 
 namespace MedicalRecordsService.Repository;
 
-public class MedicalRecordRepository : IMedicalRecordRepository
+public class MedicalRecordRepository : BaseRepository, IMedicalRecordRepository
 {
-    private readonly IDbConnectionFactory _connectionFactory;
-
     public MedicalRecordRepository(IDbConnectionFactory connectionFactory)
+        : base(connectionFactory)
     {
-        _connectionFactory = connectionFactory;
     }
 
     public async Task<IReadOnlyCollection<MedicalRecordEntity>> GetAllAsync()
     {
-        try
-        {
-            using var connection = _connectionFactory.CreateConnection();
-            const string sql = @"
-                SELECT
-                    Id,
-                    CONCAT('MR-', Id) AS RecordNumber,
-                    PatientId,
-                    DoctorId,
-                    COALESCE(UpdatedAt, CreatedAt) AS RecordDate,
-                    Diagnosis,
-                    TreatmentPlan,
-                    Description AS Notes
-                FROM medical_records
-                ORDER BY COALESCE(UpdatedAt, CreatedAt) DESC";
-            var rows = await connection.QueryAsync<MedicalRecordEntity>(sql);
-            return rows.ToList();
-        }
-        catch
-        {
-            return new List<MedicalRecordEntity>();
-        }
+        var rows = await QueryAsync<MedicalRecordEntity>(
+            StoredProcedureNames.GetMedicalRecords,
+            commandType: CommandType.StoredProcedure);
+        return rows.ToList();
     }
 
     public async Task<IReadOnlyCollection<MedicalRecordEntity>> SearchAsync(string searchTerm)
     {
-        try
-        {
-            using var connection = _connectionFactory.CreateConnection();
-            const string sql = @"
-                SELECT
-                    mr.Id,
-                    CONCAT('MR-', mr.Id) AS RecordNumber,
-                    mr.PatientId,
-                    mr.DoctorId,
-                    COALESCE(mr.UpdatedAt, mr.CreatedAt) AS RecordDate,
-                    mr.Diagnosis,
-                    mr.TreatmentPlan,
-                    mr.Description AS Notes,
-                    CONCAT(p.FirstName, ' ', p.LastName) AS PatientName,
-                    CONCAT(d.FirstName, ' ', d.LastName) AS DoctorName
-                FROM medical_records mr
-                LEFT JOIN patients p ON mr.PatientId = p.Id
-                LEFT JOIN doctors d ON mr.DoctorId = d.Id
-                WHERE CONCAT('MR-', mr.Id) LIKE @SearchTerm
-                   OR mr.Diagnosis LIKE @SearchTerm 
-                   OR mr.TreatmentPlan LIKE @SearchTerm
-                   OR mr.Description LIKE @SearchTerm
-                   OR CONCAT(p.FirstName, ' ', p.LastName) LIKE @SearchTerm
-                   OR CONCAT(d.FirstName, ' ', d.LastName) LIKE @SearchTerm
-                ORDER BY COALESCE(mr.UpdatedAt, mr.CreatedAt) DESC";
-            var rows = await connection.QueryAsync<MedicalRecordEntity>(sql, new { SearchTerm = $"%{searchTerm}%" });
-            return rows.ToList();
-        }
-        catch
-        {
-            return new List<MedicalRecordEntity>();
-        }
+        var rows = await QueryAsync<MedicalRecordEntity>(
+            StoredProcedureNames.SearchMedicalRecords,
+            new { SearchTerm = searchTerm },
+            commandType: CommandType.StoredProcedure);
+        return rows.ToList();
     }
 
-    public async Task<MedicalRecordEntity?> GetByIdAsync(int id)
+    public Task<MedicalRecordEntity?> GetByIdAsync(int id)
     {
-        try
-        {
-            using var connection = _connectionFactory.CreateConnection();
-            const string sql = @"
-                SELECT
-                    Id,
-                    CONCAT('MR-', Id) AS RecordNumber,
-                    PatientId,
-                    DoctorId,
-                    COALESCE(UpdatedAt, CreatedAt) AS RecordDate,
-                    Diagnosis,
-                    TreatmentPlan,
-                    Description AS Notes
-                FROM medical_records
-                WHERE Id = @Id";
-            return await connection.QueryFirstOrDefaultAsync<MedicalRecordEntity>(sql, new { Id = id });
-        }
-        catch
-        {
-            return null;
-        }
+        return QuerySingleOrDefaultAsync<MedicalRecordEntity>(
+            StoredProcedureNames.GetMedicalRecordById,
+            new { Id = id },
+            commandType: CommandType.StoredProcedure);
     }
 
     public async Task<IReadOnlyCollection<MedicalRecordEntity>> GetByPatientIdAsync(int patientId)
     {
-        try
-        {
-            using var connection = _connectionFactory.CreateConnection();
-            const string sql = @"
-                SELECT
-                    Id,
-                    CONCAT('MR-', Id) AS RecordNumber,
-                    PatientId,
-                    DoctorId,
-                    COALESCE(UpdatedAt, CreatedAt) AS RecordDate,
-                    Diagnosis,
-                    TreatmentPlan,
-                    Description AS Notes
-                FROM medical_records
-                WHERE PatientId = @PatientId
-                ORDER BY COALESCE(UpdatedAt, CreatedAt) DESC";
-            var rows = await connection.QueryAsync<MedicalRecordEntity>(sql, new { PatientId = patientId });
-            return rows.ToList();
-        }
-        catch
-        {
-            return new List<MedicalRecordEntity>();
-        }
+        var rows = await QueryAsync<MedicalRecordEntity>(
+            StoredProcedureNames.GetMedicalRecordsByPatientId,
+            new { PatientId = patientId },
+            commandType: CommandType.StoredProcedure);
+        return rows.ToList();
     }
 
     public async Task<MedicalRecordEntity> CreateAsync(MedicalRecordEntity record)
     {
-        using var connection = _connectionFactory.CreateConnection();
-        const string sql = @"
-            INSERT INTO medical_records
-                (PatientId, DoctorId, AppointmentId, RecordType, Title, Description, Diagnosis, TreatmentPlan, FollowUpRequired, FollowUpDate, CreatedAt, UpdatedAt)
-            VALUES
-                (@PatientId, @DoctorId, NULL, 'General', COALESCE(NULLIF(@RecordNumber, ''), 'Medical Record'), @Notes, @Diagnosis, @TreatmentPlan, 0, NULL, SYSUTCDATETIME(), SYSUTCDATETIME());
-            SELECT CAST(SCOPE_IDENTITY() as int)";
-        var id = await connection.ExecuteScalarAsync<int>(sql, record);
+        var id = await ExecuteScalarAsync<int>(
+            StoredProcedureNames.CreateMedicalRecord,
+            record,
+            commandType: CommandType.StoredProcedure);
         record.Id = id;
         record.RecordNumber = $"MR-{id}";
         if (record.RecordDate == default)
@@ -148,39 +63,20 @@ public class MedicalRecordRepository : IMedicalRecordRepository
 
     public async Task<bool> UpdateAsync(MedicalRecordEntity record)
     {
-        try
-        {
-            using var connection = _connectionFactory.CreateConnection();
-            const string sql = @"
-                UPDATE medical_records 
-                SET DoctorId = @DoctorId,
-                    Description = @Notes,
-                    Diagnosis = @Diagnosis,
-                    TreatmentPlan = @TreatmentPlan,
-                    UpdatedAt = SYSUTCDATETIME()
-                WHERE Id = @Id";
-            var rowsAffected = await connection.ExecuteAsync(sql, record);
-            return rowsAffected > 0;
-        }
-        catch
-        {
-            return false;
-        }
+        var rowsAffected = await ExecuteAsync(
+            StoredProcedureNames.UpdateMedicalRecord,
+            record,
+            commandType: CommandType.StoredProcedure);
+        return rowsAffected > 0;
     }
 
     public async Task<bool> DeleteAsync(int id)
     {
-        try
-        {
-            using var connection = _connectionFactory.CreateConnection();
-            const string sql = "DELETE FROM medical_records WHERE Id = @Id";
-            var rowsAffected = await connection.ExecuteAsync(sql, new { Id = id });
-            return rowsAffected > 0;
-        }
-        catch
-        {
-            return false;
-        }
+        var rowsAffected = await ExecuteAsync(
+            StoredProcedureNames.DeleteMedicalRecord,
+            new { Id = id },
+            commandType: CommandType.StoredProcedure);
+        return rowsAffected > 0;
     }
 }
 
